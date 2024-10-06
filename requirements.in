@@ -1,0 +1,6 @@
+langgraph==0.2.34
+pydantic-settings==2.5.2
+pydantic-settings-yaml==0.2.0
+dependency-injector==4.42.0
+click==8.1.7
+langchain-openai==0.2.1

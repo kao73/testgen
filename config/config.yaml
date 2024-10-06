@@ -1,0 +1,7 @@
+model:
+  type: openai
+  params:
+    model: gpt-4o-mini
+    temperature: 0
+
+storage_folder: ./storage
