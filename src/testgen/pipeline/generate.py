@@ -38,6 +38,7 @@ Using Python and the `unittest` package, write a suite of unit tests for the fun
 Include helpful comments to explain each line.
 Make sure the generated Python code is compilable.
 **Do not include explanation of the code.**
+**Do not include source code of the function into the test. Use imports.**
 
 {format_instructions}
 """)

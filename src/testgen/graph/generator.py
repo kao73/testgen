@@ -1,6 +1,8 @@
 import logging
+from pathlib import Path
 from typing import List, Annotated
 
+from dependency_injector.wiring import Provide, inject
 from langchain_core.messages.base import BaseMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
@@ -11,9 +13,9 @@ from typing_extensions import TypedDict
 from testgen.di import DIContainer
 from testgen.graph.base import BaseGraph
 from testgen.graph.processor import ProcessorGraph
-from testgen.models.code import CodeBlockType, CodeBlockMessage
-from testgen.pipeline.describe import DescribePipeline, FileDescription
+from testgen.models import FunctionMessage, TestFileMessage
 from testgen.pipeline.merge import MergePipeline
+from testgen.service.python import CodeExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -23,70 +25,71 @@ class InputGeneratorState(TypedDict):
 
 
 class OutputGeneratorState(TypedDict):
+    files: Annotated[List[BaseMessage], add_messages]
     tests: Annotated[List[BaseMessage], add_messages]
 
 
 class GeneratorState(InputGeneratorState, OutputGeneratorState):
-    code_blocks: Annotated[List[BaseMessage], add_messages]
+    functions: Annotated[List[BaseMessage], add_messages]
 
 
 class GeneratorGraph(BaseGraph):
     node_name = 'Generator'
     input_schema = InputGeneratorState
 
-    def __init__(self, *args, **kwargs):
+    @inject
+    def __init__(
+            self,
+            code_extractor: CodeExtractor = Provide[DIContainer.code_extractor],
+            *args,
+            **kwargs
+    ):
         super().__init__(*args, **kwargs)
-        self.describe_pipeline = DescribePipeline()
+        self.code_extractor = code_extractor
         self.merge_pipeline = MergePipeline().get_pipeline()
 
     def describe(self, state: InputGeneratorState) -> GeneratorState:
         """Describe python file and extract class names, methods and functions"""
         files = list(state['files'])
-        descriptions: List[FileDescription] = self.describe_pipeline.get_pipeline().batch(files)
-        # collect all code blocks
-        code_blocks = []
+        functions = []
         for file in files:
-            desc = next((desc for desc in descriptions if file.id == desc.file_path), None)
-            if desc:
-                file.description = desc
-                # collect file code blocks
-                file_code_blocks = []
-                for func_desc in desc.functions:
-                    func_desc._type = CodeBlockType.function
-                    func_desc._file = desc
-                    file_code_blocks.append(func_desc)
-                for class_desc in desc.classes:
-                    for method_desc in class_desc.methods:
-                        method_desc._type = CodeBlockType.method
-                        method_desc._file = desc
-                        method_desc._class = class_desc
-                        file_code_blocks.append(method_desc)
-                file.code_blocks = file_code_blocks
-                code_blocks.extend(file_code_blocks)
-            else:
-                logger.warning('No code descriptions found for %s file: ', file.id)
-        code_blocks = [
-            CodeBlockMessage(description=b)
-            for b in code_blocks
-        ]
+            file.functions = self.code_extractor.extract_functions(file.content)
+            for func in file.functions:
+                func_message = FunctionMessage(
+                    name=func.name,
+                    content=func.body,
+                    file_message=file,
+                )
+                functions.append(func_message)
         return {
-            'code_blocks': code_blocks,
-            'files': [],
-            'tests': []
+            'functions': functions,
+            'files': state['files'],
+            'tests': [],
         }
 
-    def merge(self, state: GeneratorState) -> GeneratorState:
+    def merge(self, state: GeneratorState) -> OutputGeneratorState:
         files = state['files']
-        code_blocks = state['code_blocks']
-        # collect generated blocks for each file
+        functions = state['functions']
+        tests = []
         for file in files:
-            file_code_blocks = list(filter(lambda x: x.description._file.file_path == file.id, code_blocks))
-            if len(file_code_blocks) > 1:
-                generated_code = self.merge_pipeline.invoke(file_code_blocks)
+            file_functions = list(filter(lambda x: x.file_message.id == file.id, functions))
+            if len(file_functions) > 1:
+                generated_code = self.merge_pipeline.invoke(file_functions)
             else:
-                generated_code = file_code_blocks[0].generated_code
-            file.generated_code = generated_code
-        pass
+                generated_code = file_functions[0].generated_code
+            # generate test file name
+            source_file = Path(file.id)
+            test_file = source_file.with_name(f"test_{source_file.name}")
+            test = TestFileMessage(
+                id=test_file,
+                content=generated_code,
+            )
+            file.test = test
+            tests.append(test)
+        return {
+            'files': files,
+            'tests': tests,
+        }
 
     def build(self) -> CompiledStateGraph:
         graph_builder = StateGraph(
@@ -106,8 +109,8 @@ class GeneratorGraph(BaseGraph):
         graph_builder.add_conditional_edges(
             'Describe',
             lambda state: [
-                Send(processor.name, {'code_block': code_block})
-                for code_block in state['code_blocks']
+                Send(processor.name, {'function': function})
+                for function in state['functions']
             ],
             [processor.name]
         )

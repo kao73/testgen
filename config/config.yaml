@@ -5,3 +5,6 @@ model:
     temperature: 0
 
 storage_folder: ./storage
+
+exclude:
+  - __init__

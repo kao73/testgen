@@ -18,12 +18,17 @@ class BasePipeline(ABC):
         self.model = model
 
     def get_pipeline(self) -> Runnable:
-        preprocessor = self.get_preprocessor()
-        prompt = self.get_prompt()
+        input_pipeline = self.get_input()
         model = self.get_model()
         parser = self.get_output_parser()
         postprocessor = self.get_postprocessor()
-        return preprocessor | prompt | model | parser | postprocessor
+        return input_pipeline | model | parser | postprocessor
+
+    def get_input(self) -> Runnable:
+        """Helper method to return full model input pipeline"""
+        preprocessor = self.get_preprocessor()
+        prompt = self.get_prompt()
+        return preprocessor | prompt
 
     def get_preprocessor(self) -> Runnable:
         """Returns preprocessor to convert input data into prompt variables"""

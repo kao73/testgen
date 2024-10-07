@@ -1,54 +1,14 @@
-from enum import Enum
-from typing import List, Literal, Optional, Any
-from uuid import uuid4
+from typing import Literal, Optional, List
 
 from langchain_core.messages import BaseMessage
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field
 
 
-class CodeBlockType(Enum):
-    method = 'method'
-    function = 'function'
-
-
-class CodeBlockDescription(BaseModel):
-    """Description of code block like function or method"""
-    _type: CodeBlockType = PrivateAttr(default=None)
-    _file: 'FileDescription' = PrivateAttr(default=None)
-    _class: 'ClassDescription' = PrivateAttr(default=None)
+class FunctionDescription(BaseModel):
+    """Description of Python function (global function or class method)"""
     name: str = Field(description='Name of the function or method')
-    signature: str = Field(description='The function or method signature')
-    docstring: str = Field(description='Full dockstring of the function or method if explicitly defined')
-    body: str = Field(description='Source code of the function or method')
-
-    def __init__(
-            self,
-            _type: CodeBlockType = None,
-            _file: 'FileDescription' = None,
-            _class: 'ClassDescription' = None,
-            **kwargs
-    ):
-        super().__init__(**kwargs)
-        self._type = _type
-        self._file = _file
-        self._class = _class
-
-
-class ClassDescription(BaseModel):
-    """The class description"""
-    name: str = Field(description='Name of the class')
-    docstring: str = Field(description='Dockstring of the class if explicitly defined')
-    signature: str = Field(description='Source code of the class signature')
-    constructor: str = Field(description='source code of the class constructor if explicitly defined')
-    methods: List[CodeBlockDescription] = Field(description='List of class methods')
-
-
-class FileDescription(BaseModel):
-    """The Python file code description"""
-    file_path: str = Field(description='Full path of the Python code file')
-    imports: str = Field(description='Source code of the Python imports')
-    classes: List[ClassDescription] = Field(description='List of class descriptions')
-    functions: List[CodeBlockDescription] = Field(description='List of functions')
+    body: str = Field(
+        description='Full source code of the function or method including decorators, name, docstring and comments')
 
 
 class FileMessage(BaseMessage):
@@ -57,27 +17,28 @@ class FileMessage(BaseMessage):
     type: Literal['file'] = 'file'
     """The type of the message (used for deserialization). Defaults to "file"."""
 
-    description: Optional[FileDescription] = None
-    """The code description"""
+    functions: Optional[List[FunctionDescription]] = None
+    """The list of functions"""
 
-    code_blocks: Optional[CodeBlockDescription] = None
-    """The list of code blocks descriptions"""
-
-    generated_code: Optional[str] = None
-    """The generated unit test code"""
+    test: Optional['TestFileMessage'] = None
+    """The unit test file"""
 
 
-class CodeBlockMessage(BaseMessage):
-    """Message to keep information about a code block"""
+class FunctionMessage(BaseMessage):
+    """Message to keep information about a function"""
 
-    type: Literal['code'] = 'code'
-    """The type of the message (used for deserialization). Defaults to "code"."""
+    type: Literal['code'] = 'function'
+    """The type of the message (used for deserialization). Defaults to "function"."""
 
-    description: CodeBlockDescription
-    """The code block description"""
+    file_message: FileMessage
+    """Link to the file message"""
 
     generated_code: Optional[str] = None
     """The generated unit test code"""
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(id=str(uuid4()), content='placeholder', **kwargs)
+
+class TestFileMessage(BaseMessage):
+    """Message to keep information about a test file"""
+
+    type: Literal['test_file'] = 'test_file'
+    """The type of the message (used for deserialization). Defaults to "test_file"."""
