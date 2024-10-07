@@ -2,7 +2,7 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,6 +29,7 @@ class ModelSettings(BaseSettings):
 
 class Settings(YamlBaseSettings):
     storage_folder: str
+    exclude: List[str] = Field(default='__init__', description='List of function names to exclude from analysis')
     model: ModelSettings = Field(description='LLM model settings')
 
     # configure paths to secrets directory and YAML config file

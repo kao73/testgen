@@ -45,7 +45,7 @@ class ScannerGraph(BaseGraph):
         files = list(state['files'])
         filtered = []
         for file in files:
-            if '3' in file.id:
+            if '500' in file.id:
                 filtered.append(RemoveMessage(id=file.id))
         return {
             'files': filtered

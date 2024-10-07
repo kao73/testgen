@@ -18,14 +18,14 @@ class InputWriterState(TypedDict):
 
 
 class OutputWriterState(TypedDict):
-    tests: Annotated[List[BaseMessage], add_messages]
+    pass
 
 
 class WriterState(InputWriterState, OutputWriterState):
     pass
 
 
-class WriterGeneratorGraph(BaseGraph):
+class WriterGraph(BaseGraph):
     node_name = 'Writer'
     input_schema = InputWriterState
 
@@ -65,7 +65,7 @@ if __name__ == '__main__':
         'testgen.graph',
         'testgen.tools',
     ])
-    g = WriterGeneratorGraph()
+    g = WriterGraph()
     response = g.run({'tests': [
         FileMessage(content='test', id='tests/test1.py')
     ]})

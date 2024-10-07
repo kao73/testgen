@@ -9,7 +9,7 @@ from typing_extensions import TypedDict
 from testgen.graph.base import BaseGraph
 from testgen.graph.generator import GeneratorGraph
 from testgen.graph.scanner import ScannerGraph
-from testgen.graph.writer import WriterGeneratorGraph
+from testgen.graph.writer import WriterGraph
 
 
 class InputMainState(TypedDict):
@@ -41,7 +41,7 @@ class MainGraph(BaseGraph):
         graph_builder.add_node(scanner.name, scanner.build(), input=scanner.input_schema)
         generator = GeneratorGraph()
         graph_builder.add_node(generator.name, generator.build(), input=generator.input_schema)
-        writer = WriterGeneratorGraph()
+        writer = WriterGraph()
         graph_builder.add_node(writer.name, writer.build(), input=writer.input_schema)
 
         # define edges
